@@ -1,0 +1,250 @@
+Why nosql ?
+-- cost (hardware -- RAM) is cheaper
+-- volumes of data 
+-- object/videos/audios/images -- unstructured data, semi structured
+-- relational model -- rigid schema;
+-- multiple app servers; one db server;expensive
+-- horizontal scaling -- built in , easier to maintain; no downtime required
+-- sharding/ partitioning of data -- built in 
+-- cloud computing -- high availability, easier to deploy, pay as you go, low maintanence; scaling is easier
+-- no schema ; no fixed structure; 
+-- need not be ACID compliant 
+-- adhere to CAP theorem
+	Consistency, Availability, Partition tolerance  
+	-- At a particular point of time, the db can adhere only 2 of the 3 principle 
+-- Redundancy of data-- replication of data ; high availabilty; more memory;
+-- cheap commodity hardwares
+-- 
+
+
+Types of no sql :
+Document based
+Column based
+Key value pair
+Graph based 
+
+Transaction in RDBMS:
+	unit of work ; atomic in nature
+	none or all of operations happen
+	ACID properties 
+
+
+
+Twitter -- tweets 
+Instagram -- images/ videos; 50 videos/per day; 1500 per month; 
+
+Oracle -- convert it to binary format ; BLOB, CLOB; storage, retreival
+
+Rigid schema :
+create table books(
+bookId varchar2(20),
+bookName varchar2(20),
+price decimal,
+author varchar2(20),
+primary key(bookId)
+)
+
+Ravi travelling
+Thomas music
+Ratna playing cricket, watching cricket,
+Gagan gym
+Saurabh playing chess, cricket, music ,gym, travelling
+
+create table emp1(
+empId varchar2(20) primary key ,
+empName varchar2(20),
+hobby1 varchar2(20),
+hobby2 varchar2(20),
+hobby3 varchar2(20),
+hobby4 varchar2(20),
+hobby5 varchar2(20),
+hobby6 varchar2(20)
+);// wastage of memory
+
+create table emp1(
+empId varchar2(20) primary key ,
+empName varchar2(20),
+hobby varchar2(1000)
+);
+
+create table emp2(
+empId varchar2(20) primary key ,
+empName varchar2(20),
+)
+create table emp_hobbies(
+empId varchar2(20),
+hobbyId varchar2(20),
+description varchar2(20),
+primary key(empId,hobbyId)
+)
+
+// various hobbies as string seperated by commas
+Disadv:
+-- defining more space during table creation; need to expand
+-- retreival of data : efficient 
+-- duplication of data; joins -- expensive ; cpu expensive
+-- Normalisation : multi valued attributes 
+
+
+vertical scaling 
+-- adding more resource (RAM, memory,CPU) to the single server
+
+
+horizontal scaling
+-- adding more nodes(servers) to the existing servers
+
+Oracle default behaviour -- vertical scaling
+in last 5 years -- horizontal scaling -- complexity -- difficult
+
+Nosql 
+
+Amazon - daily -- number of orders -- 10 crores orders 
+Prime day sale -- number of orders -- 100 crores orders 
+After one week after the sale -- number of orders -- 10 crores orders 
+
+Scenario 1:
+horizontal scaling: 
+Amazon - daily -- number of orders -- 10 crores orders ; 100 servers 
+Prime day sale -- number of orders -- 100 crores orders ; 1000 servers
+After one week after the sale -- number of orders -- 10 crores orders; 100 servers 
+Adv:
+	-- High availability
+	-- faster access
+Disadv: 
+	-- Multiple servers:
+		-- write on one server; write has to happen on other 99 servers; take some time; read may happen on other 99 server where the write has not happened; prob of reading stale data;
+		-- eventual consistency -- over a period of time , data will become consistent
+		-- synchronisation of reads/writes across the servers
+
+
+Scenario 2:
+vertical scaling
+Amazon - daily -- number of orders -- 10 crores orders ; 1 servers (100tb RAM) 
+Prime day sale -- number of orders -- 100 crores orders ; 1 server (1000tb RAM, memory,cpu)
+After one week after the sale -- number of orders -- 10 crores orders; scale down
+Adv:
+	-- single server; maintanence easier; cost effective 
+	-- Single server; 
+	-- reads/ writes happen on single server -- fully consistent 
+
+	-- no synchronisation	
+
+Disadv :
+	-- single server ; single source of failure
+	-- difficult to scale down
+	-- downtime during scale up;  
+	-- slower access (reads/ writes)
+
+
+Single server
+update emp set salary =1000 where empId=100;
+
+select salary from emp where empId=100;// 1000 -- 
+
+Horizontal scaling : 100 servers:
+Master slave architecture:
+writes will happen on one server; slaves will replicate the query 
+
+update emp set salary =1000 where empId=100;// one master has completed
+99 slaves will copy the same; parallel; different times;
+
+select salary from emp where empId=100;// 
+IF master is handling: 1000
+If a synched slave is handling : 1000
+If a unsynched slave is handling : previous salary
+
+
+Partitioning of data in mysql:
+-- Break up a single table 
+-- Store the data in different locations/segments
+
+No sql
+Partitioning of data
+	-- Break up data and store in different servers
+	-- Reasons: 	
+		-- Data is very huge and does not fit in a single server
+		-- Writes -- one server; search -- table scan -- across all the records -- no partitioning;
+		-- partitioning of data
+			-- Organised storage of data
+			-- Faster retrieval of data
+			-- Writes parallely; more than one server which can handle the writes; writes can be faster
+			-- Disadv:
+				Reads on basis of non partition key is slower
+				Selection of partition key is very important; majority of search should be based on partition key
+ 
+			
+
+Employee info : empId -- partition key ; range based partitioning
+Node 1(shard1 ): minKey till 10000
+Node 2: 10001 -- 30000
+Node 3: 30000 till maxKey
+
+select * from emp where empId=1000;// directly go to node1 and fetch the data
+
+select * from emp where empId between 9000 and 14000// directly go to node1, 2 and fetch the data
+
+insert into emp(empId,salary) values(2001,56);// in node 1
+
+select * from emp where salary > 5000;// broadcast the query to all the shards; shards will give reply; merge the replies and give it to the client;
+
+
+
+
+
+Node1 -- Replica set(3 servers will have the same data)
+Node2 -- Replica set
+Node 3 -- Replica set
+
+Replica set 
+	-- Same data is going to be replicated across different servers ;
+	-- Master slave architecture
+	-- Multiple members 
+
+
+3 members in a replica set 
+-- One master ; 2 slaves
+
+Shard1 : Replica set of 3 members;
+In shard1 , if one of member goes down, no problem, 2 other member have the same data;
+-- will have same data : minKey till 10000
+
+Each shard(node) should be a replica set 
+
+
+
+
+Column based database
+Cassandra: In a single table : Primary key :Country and City 
+Countries,Location,City and their population
+
+India Tamil Nadu Trichy 15L
+India Karnataka 20L
+India Maharashtra 25L
+India Tamil Nadu Chennai 23L
+
+US New York 23L
+US California 45L
+US Illnois 12L
+ 
+Store the data physically also on basis of country:
+All records which belong to same country -- put in a single partition
+Partition the data on basis on country
+Partition key -- country
+Sort the data on basis of clustering key within the same partition 
+Primary Key -- Partition key(Simple or composite) + clustering key(Simple or composite) 
+
+majority of queries in the app -- based on partition key -- faster reads/ writes
+Adv:
+	-- faster reads/ writes
+	-- Lesser number of records to be processed
+	-- Parallel processing of multiple queries ; less number of locks
+Disadv:
+	-- if search is not based on primary key, reads/writes may become slower
+
+
+select * from emp ;// table lock
+select * from emp where empId=101;// record / row level lock 
+
+
+From location A travel to location B
+
