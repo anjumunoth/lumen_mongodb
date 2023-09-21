@@ -1,0 +1,210 @@
+use databaseName;
+// create the db(if it does not exist) and switch over
+
+use lumenDb
+
+data types in javascript:
+1. number (integers and floating)
+2. string : "", ''
+3. boolean : true , false
+4. date :
+--current date and time
+var today=new Date();
+
+-- string as a param:
+var date1=new Date("2023/7/9");//9th july 2023
+
+-- number as a param:
+var date2=new Date(12345678);// ms since the epoch date(1st Jan 1970)
+
+-- many integral params: min 3 params, max 7 params
+var date3=new Date(2023, 5,12,10,30,32,45);//
+
+5. array:
+set of values can be of same datatype or different data types:
+var colours=["red","green","blue"];
+var arr1=[101,"sara",78900.456];
+arr1[0]=333;
+
+6. Object: {}
+number of key value pairs, each seperated by a comma
+
+var emp={"empId":101,"empName":"sara","salary":5678.7899};
+emp.empId=999;
+
+Mongodb :
+-- bson structure
+-- binary json
+-- bson -- java script data types+ additional data types
+Additional data types:
+1. ObjectId:
+	-- 12 byte hexadecimal number
+2. int32 -- 32 bit integer
+3. int64 -- 64 bit integer
+4. decimal
+5. double
+  
+Function calls in mongodb -- camelCase 
+Best practice -- fieldName -- camelCase
+// insert some documents
+Document -- Object
+insertOne() -- insert one document
+insertMany() -- insert many documents
+
+db.collectionName.insertOne({})
+
+db.collectionName.insertMany([])
+
+
+
+
+var insertDoc={empId:101,empName:"sara",salary:4567};
+db.employee.insertOne(insertDoc);
+
+db.employee.insertOne({empId:103,empName:"lara",salary:69,_id:103})
+db.employee.insertOne({empId:106,empName:"gita",salary:1169,_id:103})
+
+// 3 fields
+// created the collection if it does not exists
+// Did i mention any PK constraint -- NO
+// PK -- uniquely identifying the records
+// 
+
+select * from employee;
+db.employee.find();
+
+_id
+	-- Auto generated if not provided
+  -- If auto generated -- will be of ObjectId 
+  -- Combination of machineId, timestamp,processId, counter
+  -- Mandatory for all the documents
+  -- Unique within the collection
+  -- Can be provided as part of insert
+  -- If provided , data types possible -- ObjectId, number, string, date, boolean, object; not possible: array
+  -- An unique index on _id field is created implicitly whenever the collection is created
+  -- Can the index on _id be deleted explicitly -- NO
+  	-- Will be deleted when the collection is deleted
+  -- Index maintains the uniqueness of _id
+  
+App Requirement empId -- unique ; create an unique index on empId
+
+Mongo shell:
+1. mongo -- will be deprecated in near future
+2. mongosh -- latest version
+
+show databases ;// list non empty databases
+
+Databases, Collections -- 
+
+ Start Server -- location where i want to store the data;
+ Each db part of the same server -- store in a different location explicitly -- NO
+ 
+ Reads/ writes -- mongodb
+ write -- write will be executed on memory
+ Every 60 seconds will be flushed to disk
+ 
+ 
+ Start the server:
+ 1. mongod 
+ 		-- Look for location : c:/data/db
+ 2. Start the server as a service
+ 		-- Store the data : c:/programfiles/mongodb/server/5.0/data
+  3. mongod --dbpath "desktop/sample1"
+    
+ Production environment:
+ mongod --config "path to productionConfigFile"
+ In productionConfigFile: 
+ storage:
+ 	dbpath: c:/desktop/data1
+ 
+ In Only one location data will be stored -- allocate the required memory
+ 
+ 
+ 
+ db.employee.insertOne({empId:108,empName:"gita",salary:6789});// yes
+ db.employee.insertOne({empId:108,empName:"gita",salary:6789});// yes
+ db.employee.insertOne({empId:109,salary:6789});//yes with empName missing 
+ db.employee.insertOne({empName:"sita",salary:6789});// yes with empId missing
+ db.employee.insertOne({empId:"E108",empName:"tina",salary:16789});//yes
+ db.employee.insertOne({empId:null,empName:"gita",salary:6789});//yes
+ db.employee.insertOne({empId:null,empName:"harry",salary:16789});//yes
+ db.employee.insertOne({studId:5789});// yes
+ db.employee.insertOne({empId:null,empName:"sarita",salary:6789,_id:null});//yes; _id will be auto generated
+ db.employee.insertOne({empId:null,empName:"sarita",salary:6789,_id:null});//yes; _id will be auto generated
+ 
+ db.employee.insertOne({empId:777,dob: new Date(1965,6,23)});
+ db.employee.insertOne({empId:66,dob: new Date(1965,6,23)});
+ 
+ 
+ select * from employee where employee=null;// 0 records ; null is not equal to null
+ select * from employee where employee is null;
+ 
+ RDBMS : 
+ create table emp(
+ empId number(5);
+ )
+ 
+ insert into emp values (null);
+ 
+ null is a valid value for number data type;// RDBMS
+ Null itself is a data type in mongodb; valid values -- null
+ null is not going to be a valid value for any data type like int32 in mongodb
+ 
+ db.employee.insertMany([
+ {empId:110,empName:"Shyam",salary:6789},
+ {empId:111,empName:"Bheem",salary:689},
+ {empId:112,empName:"Gaur",salary:789}
+ ])
+ 
+ db.employee.insertMany([
+ {empId:113,empName:"Shalini",salary:16789},
+ {empId:114,empName:"Priya",salary:689, _id:103},
+ {empId:115,empName:"Deepa",salary:789}
+ ])
+ 
+ //113 will inserted, 114 will throw an error(exception) and break the code; rest of statements will not get executed
+ 
+ 
+ Read queries:
+ select * from employee;
+ 
+ db.collection.find();// return 0 or more documents
+ db.collection.findOne();// return 0 or 1 document
+ 
+ db.collection.find(filter doc, projection doc)
+ 
+ select * from employee;
+ db.employee.find();// return all docs in the collection
+ 
+ select * from employee where empId=101;
+ db.employee.find({empId:101});// 0 or more docs 
+ 
+ select * from employee where salary>10000
+ db.employee.find({salary>10000});//error in object syntax 
+ 
+ db.employee.find(
+ {
+ 		salary: 
+    {
+    	$gt: 10000
+    }
+  }
+ );
+ 
+Relational operators: $gt, $lt, $gte, $lte, $ne, $eq
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+
+
+
