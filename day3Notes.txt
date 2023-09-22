@@ -1,0 +1,307 @@
+
+var emp={
+	empId:101,
+  empName:"sara",
+  salary:78.908,
+  hobbies:["singing","dancing"],
+  address:{streetNo:45,city:"Chennai"},
+  projects:[
+  	{projectId:101,location:"Hyderabad"},
+    {projectId:102,location:"Bengaluru"},
+    
+  ]
+  
+}
+
+
+Relational operators:
+$gt, $lt, $gte, $lte, $eq, $ne
+
+$ne:
+db.employee.find({salary :{$ne: 6789}});
+// Docs which do not have a salary = 6789 ;// yes
+// Docs which do not have salary field;// yes
+// Docs which have the salary field and value is null;// yes
+// First find the docs which have salary=6789; other than these the docs, all the docs will be in the result set
+
+db.employee.find({empId: {$ne: 101}})
+// Docs where empId not equal to 101; empId=null; empId is missing
+
+$in , $nin, range
+select * from employee where empId in (101,103,105);
+db.employee.find({empId : {$in :[101,103,105] }});
+
+db.employee.find({empName: {$in :["sara","lara","tara"]}});
+// empName="sara";// yes
+//empName="sita";// no
+//empName="tara";// yes
+
+$nin: 
+db.employee.find({empId : {$nin :[101,103,105] }});
+// docs where empId not equal = 101
+// docs where empId not equal = 103
+// docs where empId not equal = 105
+// docs where empId  = null
+// docs where empId is missing; empId field is not present 
+
+db.employee.insertOne({empId:888,empName:"kishan"});
+// will it have salary field with a null value : NO
+// doc has only 3 fields: empId,empName, _id
+
+
+Range of values:
+select * from employee where salary between 10000 and 15000
+db.employee.find({salary : {$gt:10000, $lt:15000}})
+
+
+like: javascript pattern matching syntax
+select * from employee where name like "a%";//starts with a/A
+db.employee.find({empName :/^a/i })
+select * from employee where name like "%a";//ends with a/A
+db.employee.find({empName :/a$/i })
+select * from employee where name like "%a%";//has a/A in the name
+db.employee.find({empName :/a/i })
+
+Javascript pattern matching : 
+Pattern : //
+Modifiers: i -- ignore the case
+					 g -- global search across multiple search
+
+Operators :
+	$ ends with
+  ^ starts with
+  [a-z]: any one alphabet in lower case
+  [a-z,A-Z]: any one aplhabet
+  [0-9]: single digit
+  . -- any character
+  
+Wild card characters: Preceeding character 
+  ? -- 0 or 1 of Preceeding character
+  * -- 0 or many Preceeding characters
+  + -- 1 or more Preceeding characters
+  
+  /^a/ -- strings which starts with a
+  /^a/i -- strings which starts with a, A
+	/a$/ -- strings which ends with a
+  
+  /go?d/ -- matches: god, gd; not match: good; gold
+  
+  /go*d/ -- matches: god,good, gd,gooooooooood; not match: gold
+  
+  /go+d/ -- matches: god,good,gooooooooood
+  
+  /g..d/ -- matches : gold, good; not match : god, gd, guard, 
+  
+  /[0-9]/ -- match: single digit; sara1, s1r1;
+  
+  /[0-9]{10}/ -- match -- 10 consecutive digits match: 1234567890;not match:sara11;
+  
+  like "g%d"; g; any number of characters match: gold, god,gd,grid,greed
+  /g.*d/ -- g ; 0 or more characters; d;// match: god, gold, good, grid, guard, greed, greedy,g$d
+  /g.*d$/-- not match -- greedy
+
+
+Get all the docs where the name is exactly 4 characters:
+db.employee.find({empName:/^.{4}$/}); // exactly 4 characters
+db.employee.find({empName:/^....$/}); // exactly 4 characters
+db.employee.find({empName:/..../}); // minimum 4 characters
+db.employee.find({empName:/.{4}/}); // minimum 4 characters
+db.employee.find({empName:/[a-z]{4}/});// // minimum 4 characters
+
+Get all the docs which have a and r in their names in the same order;
+// match:sara, gauri,arjun; not match: radha;grass
+db.employee.find({empName:/a.*r/i})
+
+db.employee.find({empName:/[a,r].*[a,r]/ });
+//radha, sara,sara, gauri,arjun, radha;grass;again
+
+db.employee.find({empName:/[a,r].*[r]/ });// roar; ror
+
+//a.*r or r.*a -- Logical or operator
+
+select * from employee where empId = null;// null is not null; all records
+select * from employee where empId is null;// records for which empId is null
+
+db.employee.find({empId:null});
+// Docs for which empId=null and empId is missing
+
+db.employee.find({empId:{$ne:null});
+// Docs for which empId has a proper value
+
+$exists:
+db.employee.find({empId:{$exists:false}});// check for the existence of field;
+// Docs for which empId field is not present
+// Docs for which empId is null -- NO
+
+$type:
+-- Checking for a particular data type
+
+Docs for which _id is a number:
+
+db.employee.find({_id : {$type: 18}});; // docs for which _id is having a 64 bit integer
+
+db.employee.find({_id : {$type: 19}});; // docs for which _id is having a decimal 128
+
+_id : default data type for numeric value : Double
+Any other field : default data type for numeric value : Int32
+
+db.employee.find({empId: {$type:10}});
+// docs for which the empId field exists and is null
+
+// docs which have empId is missing -- db.employee.find({empId:{$exists:false}})
+
+Logical operators: $and, $or, $not
+
+select * from employee where salary  > 5000 and empName like "s%"
+
+salary > 5000
+ db.employee.find(
+ {
+ 		salary: 
+    {
+    	$gt: 5000
+    
+  }
+ );//khushi
+
+empName like "s%"
+
+Vasanth - db.employee.find({salary:{$gt:5000}}) 
+Vasanth - db.employee.find({empName:/^s/})
+
+Dina- db.employee.find({salary:{$gt:5000}})
+
+sourabh db.employee.find({salary: {$gt:5000}});
+db.employee.find({salary:$gt5000})\\Ratna
+db.employee.find({epmName:/^s/})\\Ratna
+db.employee.find({empName:/^s/})\\Shiva
+ db.employee.find({salary:{/^s/i}}) \\khushi
+db.employee.find({empName:/^s/}) - Altamash
+db.employee.find({salary : {$gt:5000})) //gagan
+Dina- db.employee.find({empName :/^s/ })
+db.employee.find({empName: /^s}) //gagan
+
+db.employee.find({salary: {$gt: 5000}}) - surendra
+db.employee.find({empName:/^s}) 
+db.employee.find({salary:{$gt:5000}}); Sreenivas
+db.employee.find({empName:/^s/}); Sreenivas
+
+db.employee.find({
+$and: [
+{salary:{$gt:5000}},
+{empName:/^s/}
+]
+})
+
+db.employee.find({
+$and:[
+{salary : {$gt:5000}},
+{empName : /^s/}
+]
+})
+
+1. Docs where either salary < 3000 or empName ends with a
+salary < 3000: {salary : {$lt:3000}}
+empName ends with a: {empName : /a$/i} 
+
+db.employee.find({
+$or:[
+{salary : {$lt:3000}},
+{empName : /a$/i} 
+]
+})
+
+Docs where salary > 5000 and salary < 10000 and empName starts with s and empName ends with a
+db.employee.find({
+$and:[
+{salary:{$gt:5000}},
+{salary :{$lt:10000}},
+{empName:/^s/i},
+{empName :/a$/i}
+]
+})
+
+
+
+
+Docs where empName starts with a and (salary =6789 or empId> 110)
+db.employee.find({
+$and:
+	[
+  	{empName:/^s/i},
+    {
+    	$or:[
+      	{salary:6789},
+        {empId:{$gt:110}}
+      ]
+    }
+  ]
+})
+
+Docs where name has 2 a and salary > 5000;// sara, aanand
+db.employee.find({salary:{$gt:5000},empName:/a.*a/i}) //comma operator == $and when both the conditions are on different fields 
+
+
+  //gagan
+db.employee.find({$and: [{empName: { /.*a.*a.*/i }},  {salary: { $gt: 5000 }}]});// sourabh 
+db.employee.find({$and: [{salary:{$gt:5000}},{empName:/a.*a/i}]}) //khushi
+
+
+
+db.employee.find({
+$and: [
+{salary:{$gt:5000}},
+{empName:/a.*a/i}
+]
+}) // surendra
+db.employee.find({$and:[{salary:{$gt:5000}},{empName:/a.*a/i}]}); //Ratna
+
+db.employee.find({
+$and:[
+{salary:{$gt:5000}},
+{empName:/a{2}/i}
+]
+}) // Thomas; // consecutive a
+
+Docs which have salary as integer
+db.employee.find({salary :{$type:16}})
+
+Docs which have salary is not an integer
+db.employee.find({salary :{$type:{$ne:16}}});// error : $type : number or string; passed : $type: object
+
+$not:
+db.employee.find({salary :{$not :{$type:16}}});// yes
+// Docs for which salary is not an integer;;//yes
+// Docs for which salary is missing;//yes
+// Docs for which salary is null;// yes
+
+Docs where salary is not null:  salary field should be present and should not be null
+db.employee.find({salary:{$ne:null}});//yes;salary field should be present and should not be null
+db.employee.find({salary:{$not:{$type:10}}});//NO ;will have salary is missing and salary is not null
+
+db.employee.find({salary:{$ne:6789}});//yes;salary not equal =6789, salary is missing and salary is null
+
+
+db.employee.find({empId:{$ne:null}}); // empId is present and empId is not null
+db.employee.find({empId:{$ne:null}});  //-- thomas
+	// all docs without empID col did not show
+	// all docs with empID with null came
+  
+db.employee.find({salary:{$ne:null}});  //-- thomas
+	// all docs without salary col did not show
+	// all docs with salary with null came
+  
+mongodb://localhost:27017
+
+
+_id :
+	-- Immutable (Once assigned, cannot be changed)
+  -- Modify _id : Not possible
+  -- Delete only the _id field -- Not possible 
+  
+
+
+  
+
+
+
