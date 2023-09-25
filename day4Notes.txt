@@ -1,0 +1,310 @@
+ Arrays:
+ Zipcode collection
+ 
+ Search based on position of an array:
+ Docs for which latitude > -72
+ db.zipcode.find({"loc.0" :{$gt: -72}})
+ 
+ Exact search: values should be same, position should be same and number of values should be same
+ Docs which are in a specific latitude and longitude
+ db.zipcode.find({ "loc": [-71.803133,42.579563]})
+ // array called as loc ; searching for exact search;
+ // comparing for equality between a field loc and an array
+ 
+ 
+ Search for any element matching:
+ db.zipcode.find({loc :{$gt: 40}});// Search for any element(0th element or 1st element) in the loc array should be greater than 40 
+ // result set
+ 
+ db.employee.find({salary :{$gt:5000,$lt:6000}});// range of values ; matching a number data type
+ // 5001, 5555, 5678,5999 -- match
+ 
+ db.students.insertMany([
+ {studId:101, studName:"sara",marks:[10,20,30]},
+ {studId:102, studName:"lara",marks:[30,20,10]},
+ {studId:103, studName:"tara",marks:[10,55,30]},
+ {studId:104, studName:"gita",marks:[10,20]},
+ {studId:105, studName:"sita",marks:[70,80,90]},
+ {studId:106, studName:"ram",marks:[99,99,99]},
+ {studId:107, studName:"priya",marks:[10,80,90]},
+ {studId:108, studName:"harry",marks:[10,20,30]}
+ ])
+ 
+ 1. Docs which have got the exact marks [10,20,30];// 101,108
+  {marks: [10,20,30]} - Altamash
+  
+  2. Docs for which there is a single  mark > 30
+  {marks:{$gt:30}};//103, 105,106,107
+  
+  3. Docs which have got the second element > 30
+ {"marks.1" :{$gt:30}} ;// 103,105,106,107
+ 
+ 4. Docs which have got the marks : [10,20,30] irrespective of their position:
+  {marks: [10,20,30]} ;// exact search
+  
+  $all: search for a subarray (values are matched but not position)
+  db.students.find({marks :{$all:[10,20,30]}});// 101,102,108
+  
+  5. db.students.find({marks:{$all:[10,20]}});//104,101,102,108
+  db.students.find({marks:[10,20]});//104 ; exact search
+  db.students.find({marks:[20,10]});//no result ; exact search
+  
+  6. Array should have 2 elements and they can be 10,20 in any order
+  db.students.insertOne({studId:109, studName:"fred",marks:[20,10]})
+  db.students.find({
+  $and:[
+  {marks:{$size:2}},
+  {marks:{$all:[10,20]}}
+  ]
+  });// [10,20]; [20,10]
+  
+  Objects:
+  
+  // Docs which are in the zipcode "10462"
+  db.restaurant.find({"address.zipcode":"10462"});// 
+  
+  // Docs which are in a particular latitude
+  db.restaurant.find({"address.coord.0":-73.856077});// 
+  
+  // Docs which have any element in the coord array== -73.856077 
+  db.restaurant.find({"address.coord":-73.856077});// 
+  
+  Array of objects:
+  //In grades array at position 0 , is there a score=7 
+  db.restuarant.find({"grades.0.score":7})
+  
+  db.restuarant.find({"grades.score":7});// In grades array, if there is any one (atleast one)object whcih has a score =7 
+  
+  db.restaurant.find({
+  $and:[
+  {"grades.score": 7},
+  {"grades.grade":"C"}
+  ]
+  })
+  // In grades array, atleast one element(object) which has a score field with score=7,
+  // In grades array, atleast one element(object) which has a score field with grade="C",
+  // logical "and" opeartion on above 2 results
+  // Is it mandatory that the same element should match both the condition -- NO
+  
+  $elemMatch:
+  search if there is a single element which matches the condition(s)
+  // 6 docs
+  db.restaurant.find({
+  grades: {
+  	$elemMatch:{score:7,grade:"C"}
+  }
+  })
+  
+  
+  Projection :
+  select * from employee;// project all fields
+  select empId, empName from employee;;// project 2 fields
+  
+  select empId,empName from employee order by empName;// sort
+  
+  db.collectionName.find(filter doc, projection doc);
+  // 2 params optional
+	// projection doc -- object syntax
+  	-- Inclusion list or exclusion list
+    
+  db.employee.find({});// all docs, all fields
+  
+  db.employee.find({}, {empId:1,empName:1});// fields: empId,empName, _id for all docs
+  
+  db.employee.find({}, {empId:1,empName:1,_id:0});// fields: empId,empName, for all docs
+  
+  db.employee.find({}, {salary:0});// except salary, all the other fields (including _id) for all docs
+  
+  db.employee.find({}, {empId:1,salary:0});// error -- cannot have a mix of inclusion and exclusion
+  
+  
+Sort the docs:
+select * from employee order by salary,empName;// order by salary in asc order; wherever salary is same, sort by empName
+select * from employee order by empName,salary;
+// Will the result set of above 2 queries be the same -- NO 
+
+db.employee.find().sort({salary:1});// Sort all the docs in asc order of salary
+
+db.employee.find().sort({salary:-1});// Sort all the docs in desc order of salary
+
+db.employee.find().sort({salary:1,empName:1});// Sort all the docs in asc order of salary, and wherever salary is same, sort in asc order of empName
+
+db.employee.find().sort({salary:1,empName:1});
+db.employee.find().sort({empName:1,salary:1});
+// Will the result set of above 2 queries be the same -- NO 
+
+Asc order:
+1. Docs where salary is not present
+2. Docs where salary is null
+3. Docs sorted with salary is asc
+(upper case and then lower case)
+
+db.employee.find().sort({salary:1});// wherever salary is same, insertion order is followed
+
+Limit and skip: 
+Limit : Limit the result to the specified number
+Skip : Skip n docs and return the rest of docs
+
+db.employee.find().limit(5);// first 5 docs coming from the find condition. 
+
+db.employee.find().skip(5);// skip the first 5 docs coming from the find condition and display the rest of find result set
+// display 18 docs (23-5);
+
+db.students.find().limit(5).skip(5);//106 to 110
+db.students.find().skip(5).limit(5);//106 to 110
+// First skip will be executed before limit irrespective of where its placed 
+
+
+db.employee.find().sort({salary:1}).limit(5);
+// sort the docs on asc order of salary and get the first five (lowest 5)
+// five employees according to insertion order and then sort them on their salaries -- Not the correct answer
+
+Update Query:
+updateOne() -- update 0 or 1 doc
+updateMany() -- updating 0 or many docs
+
+updateOne(filter doc, update doc, options)
+updateMany(filter doc, update doc, options)
+
+Result set: Object
+{  
+	acknowledged: boolean,
+  matchedCount: integer >=0
+  modifiedCount : integer >=0
+}
+
+matchedCount : number of docs matching the filter doc
+modifiedCount : number of docs modified according to the update doc
+
+db.students.updateOne(
+	{studName:"sara"}, 
+  {$set : {location:"Chennai"}}
+  )
+{acknowledged: true,  matchedCount: 1,  modifiedCount : 1}
+
+$set : 
+	-- modify an existing field if it exists
+  -- add a new field if it does not exists
+  
+db.students.updateOne(
+	{studId : {$gt:105}}, 
+  {$set : {location:"Chennai"}}
+  )
+{acknowledged: true,  matchedCount: 1 ,  modifiedCount :1 }
+{studId : {$gt:105}} -- 4 docs
+
+db.students.updateOne(
+	{studId : 101}, 
+  {$set : {location:"Chn"}}
+  )
+{acknowledged: true,  matchedCount: 1 ,  modifiedCount :0}
+
+db.students.updateOne(
+	{studId : 555}, 
+  {$set : {location:"Chennai"}}
+  )
+{acknowledged: true,  matchedCount: 0,  modifiedCount :0 }
+
+Is the following result set possible:
+{acknowledged: true,  matchedCount: 0,  modifiedCount :1 };// NO
+
+
+db.students.updateMany(
+	{studId : {$gt:105}}, 
+  {$set : {location:"Chennai"}}
+  )
+{acknowledged: true,  matchedCount: m ,  modifiedCount : n}
+Possible  values for m : 0,1,2,3... (total number of docs)
+Possible  values for n : 0,1,2,3... (m)
+n<=m
+
+If m=5, n=9 ; 
+
+10 docs; 10th doc is having 15 fields, add an additional field
+db.newCollection.updateOne({_id:10},{$set:{projectId:"P101"}})
+
+Addition of field: updateOne() -- $set;
+Deletion of field: updateOne(), updateMany() -- $unset
+
+db.students.updateOne(
+	{studId : 101}, 
+  {$unset : {location:1}}
+  )
+{acknowledged: true,  matchedCount: 1 ,  modifiedCount :1 };// will remove the location field from only one doc 101
+
+db.students.updateOne(
+	{studId : 101}, 
+  {$unset : {schoolName:0}}
+  )
+{acknowledged: true,  matchedCount: 1 ,  modifiedCount :1 };// will remove the schoolName field from only one doc 101
+// $unset : {"fieldToBeDeleted": anyNumberValue}
+
+db.restuarant.updateOne({restaurant_id:"567"},{$unset:{"address.zipcode":1}})
+
+db.students.updateOne({studId:101},{$set:{collegeName:"loyola",studName:"sara"},$unset:{marks:1}})
+// 1 Add a new field collegeName="loyola"
+// 2 Update the existing field studName="sara"
+// 3 Remove the marks(array) field 
+Multiple changes done on a single doc
+{acknowledged: true,  matchedCount: 1 ,  modifiedCount :1 };
+
+db.students.updateOne({studId:1010},{$set:{studName:"tina"}})
+{acknowledged: true,  matchedCount: 0 ,  modifiedCount :0 };
+
+// Upsert
+	-- If the doc according to filter doc exists, update the doc
+  -- If the doc according to filter doc does not exists, insert the doc
+
+db.students.updateOne({studId:1010},{$set:{studName:"tina"}},{upsert:true})
+{acknowledged: true,  matchedCount: 0 ,  modifiedCount :0 , upsertedId: autogenerated};
+// insert a new doc
+{_id: auto generated, studName:"tina", studId:1010}
+
+
+db.students.updateMany({studId:{$lt:100}},{$set:{studName:"hina"}},{upsert:true})
+{acknowledged: true,  matchedCount: 0 ,  modifiedCount :0 , upsertedCount: 1};
+// insert a new doc
+{_id: auto generated, studName:"hina"}
+
+
+
+Deletion of docs:
+deleteOne() -- delete 0 or one Doc
+deleteMany() -- delete 0 or many docs
+
+db.students.deleteOne({}) -- delete the first inserted doc
+db.students.deleteOne({studId:106}) -- delete the first doc which satisfies the filter doc
+
+db.students.deleteMany({}) -- delete all the docs in the collection
+db.students.deleteMany({studId :{$gt:105}}) -- delete all the docs in the collection which satisfy the filter doc
+
+1000 docs; accidentally deleted 100 docs ; 
+In rdbms -- rollback ; commit
+In mongodb -- there is no concept no rollback; always on autocommit; 
+Solutions: 
+	--Regular backup
+  -- Replication -- same data stored in different servers(delayed member ) -- help u in getting the deleted data
+
+Fragmentations will occur -- defragmentation is default process
+Explicitly -- compact will free up the free space
+
+
+
+
+
+
+
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+ 
