@@ -1,0 +1,227 @@
+Primary Works:
+	-- installation, creating db
+  -- upgrading releases/ patching/ migration
+  -- maintaining the various servers
+	-- backups, restore, disaster recovery
+  -- maintaining availability of data -- automatic failover
+  -- security -- authentication, authorisation
+  -- performance tuning -- good response times, faster queries, identify slow queries,
+  -- memory management
+  -- audits
+  -- encryption, tls(field level encryption)
+  -- designing/modifying the data schema
+  -- running traces
+  -- moving the data to production, db refresh
+  -- deadlock detection
+  -- data import/export
+
+Query:
+	Execution engine : execute the query
+  identify  the various plans for executing the query
+  select the winning plan, other plans -- rejected plans
+  
+  For a plan to win
+  	-- time for executing the query
+    -- advanced/ works to do to execute the query
+    -- number of docs to be queried to execute the query
+    -- Locks / yield the lock
+    -- cache memory -- temp memory in RAM, faster access, very frequently accessed data
+    
+namespace : database.collectionName
+
+
+Indexes: 
+	-- Speeden up the read queries
+  -- Write queries -- slow; write the data in collection, modify the index(es) as per the write query
+  -- maintain the indexes
+  -- Consume space ; Allocate space in disk in files (wired tiger -- .wt files)
+  -- Consume sapce as cache memory
+  -- b-tree index
+  -- Index creation -- time consuming process, locks involved(row level, collection level), memory(temp structures), affect the read/writes not entirely 
+  -- Index cannot be modified 
+  	-- Drop the index and create it again
+    -- Exception : modify the expiryAfterSeconds alone
+  
+Types of Indexes:
+1. Simple Index
+	-- Index built on a single field
+		-- String 
+    -- Number
+    -- Date
+    -- Array
+    -- Object
+    -- Embedded field
+    -- ObjectId
+    
+    
+2. Composite / Compound Index:
+	-- Index built on multiple fields
+  	-- All data types possible
+
+3. Hashed Index
+	-- take the field value -- send it to a hashing algorithm, index is created on hashed value
+  -- Even distribution of data
+  -- Best data types -- ObjectId, timestamp
+  
+4. Geo spatial index 
+	-- nearest, distance between the 2 points
+  -- built only on geop spatial data
+
+5. Text Index
+	-- Built on string data; can be simple/composite
+  -- In a collection , only one text index allowed
+  -- Very huge in size
+  -- search term is going to be searched for in the various text indexed fields
+  -- Specify the fields on which index has to be built
+  
+Properties:
+1. Unique:
+	-- Index will not allow duplicate values for the indexed field. Allow one null
+  
+2. Sparse Index
+	-- Only docs which have the indexed field will be taken for index creation. Other docs without the indexed firld will be ignored
+  -- Lesser space, More efficient for queries on indexed field
+  
+Simple index -- 23 docs
+Sparse index -- 18 docs
+find({empId:{$gt:105}});// scan thru 18 docs; using sparse index is better
+find({empId: {$ne:123}});// null entries, missing fields, !=123;sparse index cannot be used; collscan or simple index
+
+3. Partial index:
+	-- Docs which satisfy the partialFilterExpression(conditions) will be taken creating the indexes
+  --	cuisine:"American "
+    Docs for which cuisine is American will be taken for index creation
+  -- Lesser space, quick access to collection
+  Collection : 10lakh docs
+  	cuisine: "American " -- 2 lakh docs
+    Partial index : index entries on 2lakh docs; lesser space
+    	db.restaurant.find({cuisine:"American ", borough:"Bronx"})
+      // partial index -- scan 2lakh docs; no need to do coll scan
+      // majority of queries on partial filter expression -- faster results
+    
+  --Index with partialFilterExpression salary :{$gt: 5000}
+  db.employee.find({salary:{$gt:10000}});// Partial Index will be used
+  db.employee.find({salary:{$gt:7000,$lt:14000}});//Partial Index will be used
+  
+4. TTL index:
+	-- total time to live index
+  -- Special index
+  -- Index can be built on date fields
+  -- expiryAfterSeconds -- configure -- For eg: 300 seconds
+  -- 300 seconds has elapsed since the value in the indexed field -- implicitly document will be marked for deletion
+  -- Log rotation, session information
+  
+5. Wild card property
+	-- Can be combined only with a text index
+  -- Take up all the fields for index creation which have a string value
+  
+Create a index
+Simple index
+  db.collectionName.createIndex({fieldName : 1|-1});
+	-- Sort order is not important
+  
+Compound index :
+  db.collectionName.createIndex({fieldName1 : 1|-1,fieldName2 : 1|-1 });
+  -- Order of fields is very important
+	-- Sort order is also very important
+  
+db.restaurant.createIndex({cuisine:1});// name : cuisine_1
+db.zipcode.createIndex({state:-1});// name: state_-1
+db.zipcode.createIndex({city:1},{name:"city_1"});
+
+db.zipcode.createIndex({city:1},{name:"city_1", sparse:true});
+db.restaurant.createIndex({restaurant_id:1},{unique:true});// name : cuisine_1
+db.employee.createIndex({empId:1},{partialFilterExpression : {"empId":{"$gt":100}}})
+db.employee.createIndex({empName:1},{partialFilterExpression : {"salary":{"$gt":1000}}})
+
+
+Examples:
+db.restaurant.createIndex({cuisine:1});// name : cuisine_1; simple index; non sparse index
+
+db.restaurant.find({cuisine:"American "});// Use cuisine index
+
+db.restaurant.find({cuisine:"American ", borough:"Bronx"});// Use cuisine index
+Stages : IXSCAN, Fetch and filter
+
+db.restaurant.find({borough:"Bronx",cuisine:"American "});// Use cuisine index
+Winning plan:
+Stages : IXSCAN, Fetch and filter
+
+db.restaurant.find({}).sort({cuisine:1});// Use cuisine index
+
+db.restaurant.find({}).sort({cuisine:-1});// Use cuisine index
+
+db.restaurant.find({borough:"Bronx"}).sort({cuisine:1});// Use cuisine index
+Plan1: Coll scan; filter on basis on borough ; sort the result set
+Stage 1: collscan: docs to be examined -- 3772 , m sec;; filter -- n sec; sort -- o sec; Total time : m+n+o
+Plan 2: IXSCan (get all index entries);fetch and filter(borough:Bronx) 
+Stage 1: Ixscan -- index entries returned -- x <=3772 m1 sec; m1< m; fetch - n1 sec ;filter o1 sec; Total time : m1+n1+o1 <(m+n +o)
+
+
+Zipcode:
+db.zipcode.createIndex({state:1})
+db.zipcode.createIndex({city:1})
+
+db.zipcode.find({state:"MA"});// state_1;//474 docs
+db.zipcode.find({city:"AGAWAM"});// city_1;// 1 docs
+
+db.zipcode.find({state:"MA",city:"AGAWAM"});
+// winning plan : plan 2
+plan 1: index on state; fetch and filter
+stage 1: index entries returned : 474
+plan 2: index on city; fetch and filter
+stage 1: index entries : 1
+plan 3:
+stage 1: Ixscan on state, IXscan on city stage : AND_SORTED : Logical and op on both the result set and sort it
+
+-- Multiple indexes can be used on same query
+-- All plans are executed, but once any plans has a higher advanced value, they are aborted and added to rejected plans
+
+-- Can i build 2 same indexes(same order) on same field -- NO
+-- Can i build another simple index on _id with a different sort order-- NO 
+-- can i build 2 indexes on same field with different sort order -- YES; not so useful
+-- can i have a unique and normal index on same field which differ in sort order -- Yes; not so useful
+-- Which index will be used if i have a normal and unique index ; whichever is in the cache or whichever can come to cache faster
+-- Can i create a unique on a field which has redundant values; state, salary -- NO
+
+
+find( "restaurant_id": "30112340");
+// winning plan : unique index:
+plan 1: unique index
+
+plan 2: normal index
+Both the plans: time be same; works/advanced -- same ; 
+
+cache memory:
+
+db.zipcode.find({state:"MA"}).sort({city:1});
+db.zipcode.find({city:"AGAWAM"}).sort({state:1});
+
+Hint an index: force the execution engine to use a particular index;
+	-- No rejected plan
+
+db.restaurant.find({restaurant_id:"45678"});// restaurant_id_1 index is used
+
+Hint to use the unique index:
+db.restaurant.find({restaurant_id:"45678"}).hint({restaurant_id:-1});// restaurant_id_-1 index is used
+
+
+
+Unique index on restaurant_id, normal index on cuisine
+db.restaurant.find({restaurant_id:"671",cuisine:"American "});// 
+winning plan: plan 1
+plan 1: use restaurant_id index ; time -- advanced/works
+stage 1 : 0 or 1 index entries 
+plan 2: use cuisine index
+stage 1: 0 or more index entries surely greater than 1
+plan 3: use both indexes
+
+  
+  
+  
+  
+  
+  
+  
+
+
