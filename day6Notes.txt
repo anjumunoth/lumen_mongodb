@@ -1,0 +1,215 @@
+db.zipcode.createIndex({state:1})
+db.zipcode.createIndex({city:1})
+
+db.zipcode.find({state:"MA"}).sort({city:1});// state index 
+db.zipcode.find({city:"AGAWAM"}).sort({state:1});// city index
+
+
+Composite/ compound index
+-- Index on multiple fields
+-- Order of fields is important(prefix field should be used)
+-- Sort order of fields is also important
+
+db.zipcode.createIndex({state:1,city:-1})
+
+db.zipcode.find({state:"MA",city:"AGAWAM"});// compound index will be used;
+db.zipcode.find({state:"MA"});// compound index will be used
+db.zipcode.find({city:"AGAWAM"});// compound index will not be used because prefix field is not used
+db.zipcode.find({city:"AGAWAM",state:"MA"});// compound index will be used
+
+db.zipcode.find({}).sort({state:1});// compound index will be used;
+db.zipcode.find({}).sort({state:-1});// compound index will be used;
+db.zipcode.find({}).sort({city:1});// compound index will not be used because prefix field is not used
+db.zipcode.find({}).sort({city:-1});// compound index will not be used because prefix field is not used
+
+db.zipcode.find({}).sort({state:1,city:-1});// compound index will be used;
+db.zipcode.find({}).sort({state:1,city:1});// compound index will not be used;
+db.zipcode.find({}).sort({state:-1,city:-1});// compound index will not be used;
+db.zipcode.find({}).sort({state:-1,city:1});// compound index will be used;
+
+Index entries:
+
+AK city3
+AK city2
+Ak city1
+
+MA city3
+MA city2
+MA city1
+
+ZA city3
+ZA city2
+ZA city1
+
+hashed index:
+-- Even distribution of data
+-- Cannot be created using gui
+db.restaurant.createIndex({restaurant_id:"hashed"})
+
+TTL Index :
+-- Works only on date fields
+-- Created also on date fields
+-- Delete those docs for which the expiryAfterSeconds has elapsed since the indexed field
+-- Mark the docs for deletion
+-- background process which at regular intervals will go and delete the docs marked for deletion
+-- Possibility that the doc may stay for some extra time (< 60 secs) before getting deleted
+-- Will take some time for the first time alone for index creation to delete the docs
+-- Should be only a simple index
+
+db.sessionData.insertMany([
+{sessionId:101,startDate:new Date()},
+{sessionId:102,startDate:new Date(2022,2,1,10,30)},
+{sessionId:103,startDate:new Date(2023,2,1,10,30)},
+{sessionId:104,startDate:new Date(2024,2,1,10,30)},
+{sessionId:105,startDate:"2020/03/01"}
+])
+105 will never get deleted by the ttl index during its lifetime
+db.sessionData.createIndex({startDate:1},{expireAfterSeconds:300})
+
+After 300 seconds :
+docs marked for deletion:101,102,103
+
+After 60 days: 60*24*60 = value in seconds
+Convert 60 days into seconds: 
+
+Change the expireAfterSeconds from 300 secs to 100 secs
+db.runCommand({
+  "collMod": "sessionData",
+  "index": {
+    "keyPattern": { "startDate": 1 },
+    "expireAfterSeconds": 100
+  }
+})
+
+Text index:
+-- String fields
+-- Simple or composite
+-- Only one text index possible per collection
+-- Very huge in size
+-- Query should have a $text operators
+-- Will match the exact words and similar words
+-- By default all the fields in the index will have a weight=1
+-- Configure the fields to have different weights
+-- Score : 
+	(Weight of field1 * number of occurences of search term in that field1)+(Weight of field2 * number of occurences of search term in that field2)
+  -- Field has to get more weightage: create the index with different weights
+db.restaurant.createIndex({cuisine:"text",name:"text"});// default weight :1
+
+db.restaurant.createIndex({cuisine:"text",name:"text"},{weights:{cuisine:5,name:10}});// default weight :1
+
+db.restaurant.find({cuisine:"American ", name:/^m/i});// not use the text index
+
+db.restaurant.find({$text:{$search:"Bake"}});
+// text index will be used
+// search for "Bake" on the fields on which text index has been created
+
+name: Morris Park Bake Shop -- 4 index entries
+Match : Bake, Baking, 
+
+db.restaurant.createIndex({cuisine:"text",name:"text"},{weights:{cuisine:5,name:10}});
+
+db.restaurant.find(
+   {
+      $text: { $search: "bake" }
+   },
+   {
+      score: { $meta: "textScore" },name:1,cuisine:1,_id:0
+   }
+).sort( { score: { $meta: "textScore" } } )
+
+Why multiple text indexes are not allowed:
+-- Text index -- huge in size
+-- Index -- slow down the write operation on a bigger scale
+-- Query should be using the $text operator
+-- We dont mention the fields in query
+-- Full collection scan
+	
+Wild card index : 
+-- Special type of text index
+-- Index is built on all the string fields in the document
+-- Dont have to mention the field names on which index have to be created
+
+
+db.zipcode.createIndex({"$**":"text"})
+db.zipcode.createIndex({"$**":"text"},{weights:{name:10}})
+
+Find:
+Collation: 
+-- Rules to be followed for string comparison
+-- Specify them as an object
+-- Mandatory property: 
+	-- locale -- language which we are going to use
+-- Optional properties
+	-- strength
+  -- caseFirst
+  -- caseLevel
+  -- numericOrdering
+2>5 -- false
+101 > 2 -- true
+"101" > "2" -- false; String comparison
+
+Requirement : Number stored as a string  -- number comparison
+	-- "101" > "2" -- true ;; number comparison
+  
+sara, Shyam, fred, Gita
+Sort the names in asc order:
+Gita,Shyam,fred,sara;// default behaviour
+fred, Gita, sara, Shyam;// ignoring the case
+fred,sara,Gita,Shyam;// lower case first
+
+sort the names in french language
+
+diacritics -- sort -- consider
+
+
+collation:
+{
+locale:"en"
+strength:1 ,//(only base characters)
+caseLevel : true// case sensitive matching
+}
+// Match base characters and do a case sensitive matching
+
+
+collation:
+{
+locale:"en"
+strength:3 ,
+caseLevel : true;// case sensitive matching
+}
+// caseLevel is not needed
+// strength :3 -- base char, diacritics and case
+
+collation:
+{
+locale:"en"
+strength:3 ,
+caseLevel : false;// case insensitive matching
+}
+// should not give like this
+
+
+Replication: 
+
+db.restaurant.find({}).sort({cuisine:1}).collation({locale:"en",strength:1,caseFirst:"lower"})
+// "sara" "Sara"
+
+db.restaurant.find({}).sort({cuisine:1}).collation({locale:"en",strength:3})
+// "Sara", "sara"
+
+db.restaurant.createIndex({borough:1},{collation:{locale:"simple",caseFirst:"lower"}});// lower case will come first
+;// Bronx , bronx 
+// one time process
+
+db.restaurant.find({}).sort({borough:1}).collation({locale:"simple"});// will not use the index
+db.restaurant.find({}).sort({borough:1}).collation({locale:"simple",caseFirst:"lower"});// will  use the index
+
+db.restaurant.find({}).sort({borough:1});// will not use
+// default : locale: simple ; caseFirst: upper case
+
+
+
+
+
+
+
