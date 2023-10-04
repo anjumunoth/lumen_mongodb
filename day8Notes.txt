@@ -1,0 +1,217 @@
+// mongod1.cfg
+# mongod.conf
+
+# for documentation of all options, see:
+#   http://docs.mongodb.org/manual/reference/configuration-options/
+
+# Where and how to store data.
+storage:
+  dbPath: C:\Users\Admin\Desktop\replication\data1
+  journal:
+    enabled: true
+#  engine:
+#  wiredTiger:
+
+# where to write logging data.
+systemLog:
+  destination: file
+  logAppend: true
+  path: C:\Users\Admin\Desktop\replication\data1\mongod.log
+
+# network interfaces
+net:
+  port: 1001
+  bindIp: 127.0.0.1
+
+
+#processManagement:
+
+#security:
+
+#operationProfiling:
+
+replication:
+  replSetName: lrs1
+#sharding:
+
+## Enterprise-Only Options:
+
+#auditLog:
+
+#snmp:
+
+
+Replica set 
+3 members
+	1001, 1002, 1003
+  dbpath
+  replica set name : lrs1
+  
+Create 3 folders called as data1, data2, data3 within the replication folder
+Create a first mongod1.cfg by changing dbPath, log path, port and replication with replSetName as lrs1
+
+Create mongod2.cfg and mongod3.cfg
+
+
+Start the servers
+
+Open a new command prompt from bin folder
+mongod --config "C:\Users\Admin\Desktop\replication\mongod1.cfg"
+
+Open a new command prompt from bin folder
+mongod --config "C:\Users\Admin\Desktop\replication\mongod2.cfg"
+
+Open a new command prompt from bin folder
+mongod --config "C:\Users\Admin\Desktop\replication\mongod3.cfg"
+
+Open a new command prompt from the bin folder and connect to the shell to one of the above servers
+// mongosh --port 1001 --host 
+mongosh --port 1001
+Priority : 1
+Votes :1
+// Initiate the replica set and members with the default settings 
+rs.initiate({
+_id:"lrs1",
+members:[
+{_id:0, host:"localhost:1001"},
+{_id:1, host:"localhost:1002"},
+{_id:2, host:"localhost:1003"},
+]
+})
+// All members will be added as "Others", then they will become secondary
+// Elections will happen and one of the members will become the primary
+
+
+rs.status() -- dynamic value;
+rs.config() -- configuration setup ; configurable
+
+Create a replica set -- Adding the data
+
+-- Existing data -- store it in a replica set:
+1. Back up of data
+2. Create the replica set
+3. Restore the data on primary member in replica set
+
+rs.printReplicationInfo()
+
+rs.printSecondaryReplicationInfo()
+Prints a formatted report of the replica set status from the perspective of the secondaries.
+
+
+rs.secondaryOk();// session level, secondary node
+
+Connection string:
+mongodb://localhost:1003,localhost:1002/?replicaSet=lrs1&readPreference=secondaryPreferred
+
+mongodb://abc.com:1003, xyz.com:1002/?replicaSet=lrs1&readPreference=secondaryPreferred
+
+mongoshell --> member of replica set
+
+mongoshell --> replica set
+
+mongosh --port 1001 --host localhost
+
+Compass -- connecting to replica set; driver is in between compass and server
+mongosh --port 1001;// Connecting to one of the members of replica set
+
+Add a new member:
+
+Create data4, mongod4.cfg
+Open a new command prompt from bin folder
+mongod --config "C:\Users\Admin\Desktop\replication\mongod4.cfg"
+
+Add the server at port 1004 as normal member
+
+Connect to the primary:
+mongosh --port 1001
+
+rs.add({_id:3,host:"localhost:1004"})
+
+Change the configuration of existing node: Priority :10
+var myConfig= rs.config();
+myConfig.members[3].priority=10
+rs.reconfig(myConfig);
+
+// Reconfiguration -- elections will happen; 1004 will become the primary because it has the highest priority
+
+Priority:  >=0 ; positive number
+
+1001(primary),1002, 1003 -- priority :1
+Scenario 1:
+1004(p10) comes up 
+	-- Sync with the primary(or a fully synched sec)
+  -- Finished synching
+  -- Since it has the highest priority -- call for an election
+  -- Election will happen
+  -- 1004 becomes the primary
+
+Scenario 2:
+1004(p1) comes up 
+	-- Sync with the primary(or a fully synched sec)
+  -- Finished synching
+  -- 1004 will remain secondary
+  
+Arbiter 
+	-- election process
+  -- number of voting members
+  -- not included in number of writable members
+  -- min config -- not going to hold any data
+  
+PSSS
+ write concern -- majority : 3
+ 
+PSSSA
+	write concern -- majority :3
+  
+PSA -- configuration
+number of data bearing nodes : 2
+
+  
+Create data5, mongod5.cfg
+Open a new command prompt from bin folder
+mongod --config "C:\Users\Admin\Desktop\replication\mongod5.cfg"
+
+rs.addArb("localhost:1005")
+
+
+Add a hidden member
+Create data6, mongod6.cfg
+Open a new command prompt from bin folder
+mongod --config "C:\Users\Admin\Desktop\replication\mongod6.cfg"
+
+Connect to the primary:
+mongosh --port 1004
+
+rs.add({host:"localhost:1006",hidden:true,priority:0})
+
+Add a delayed member:
+Create data7, mongod7.cfg
+Open a new command prompt from bin folder
+mongod --config "C:\Users\Admin\Desktop\replication\mongod7.cfg"
+
+Connect to the primary:
+mongosh --port 1004
+rs.add({host:"localhost:1007",secondaryDelaySecs: 300,priority:0})
+
+First time when i add a delayed sec
+	-- Fully sync with primary without any delay
+  -- After the initial sync is complete
+  -- Sync with the primary with a delay of 300 secs
+  
+Election is in progress --
+	-- there is no primary
+	-- secondaries are syncing the data -- No
+  
+Add a new node:
+	-- Sync with the current primary
+  -- After the initial sync is over
+  -- If it has the highest priority and completed with the sync -- then call for election
+
+
+
+
+
+
+
+
+

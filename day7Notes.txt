@@ -1,0 +1,351 @@
+Replication:
+-- Store same data in multiple servers
+-- High availability
+-- More number of servers to handle the reads -- Faster reads/more reads
+-- Redundant data
+-- More memory consumption, more cost 
+-- Consistency of data -- eventual consistency
+-- Read/writes
+-- Master/slave architecture
+-- Full consistency is acheivable but thera are some limitations
+-- Synchronisation of data between the various servers
+-- 
+
+Replica set -- set of nodes(servers,member)
+	-- Maximum 50 members
+  -- Only 7 voting members
+  -- Best practice -- Odd number of members  
+    
+Member/Node
+-- Configure properties
+	-- Priority -- positive integer >=0
+  -- Votes -- 0 or 1
+ 
+Different types of members:
+1. Primary
+	-- Priority >0
+  -- Votes - 0 or 1
+  -- Handle both the reads and writes -- default behaviour
+  -- Is the only member who can handle the writes
+  -- Should be only primary per replica set
+  -- If primary is down -- writes will be affected; reads may be unaffected if the other members have been configured to handle them
+
+2. Secondary
+	-- Multiple secondary members
+  -- Different types of secondaries:
+  a. 	Normal Secondary
+  	-- Priority >0
+  	-- Votes -- 0 or 1
+		-- Can become the primary
+    -- Default -- Cannot handle the reads
+    -- Configure to handle the reads
+    -- Can never handle the writes(from the client directly) if they are secondary
+    -- Sync with the primary to be up to date
+    -- 
+    
+  b. Zero Priority Secondary node:
+  	-- Priority : 0
+    -- Can never become the primary
+    -- Configure to handle the reads
+    -- Votes : 0 or 1
+    -- Sync with the primary to be up to date
+	  -- Can never handle the writes(from the client directly) 
+    
+  c. Hidden secondary member :
+  	-- Hidden from the client
+    -- Can never be configured to handle the reads(from the client app directly) 
+    -- Can never handle the writes(from the client directly) 
+    -- Priority : 0
+    -- Votes : 0 or 1
+    -- Sync with the primary to be up to date
+    -- Can change it to a secondary node
+    -- Use case : Back up the data, Reporting(shell)
+    
+  d. Delayed secondary member:
+  	-- Sync with the primary after the configured delay
+    -- Priority : 0
+    -- Should never become the primary
+    -- Should never handle the reads(from the client app directly)
+    -- Should be hidden from the client
+    -- Votes : 0 or 1
+    -- Use case: Help in Roll back operation
+
+3. Arbiter member
+	-- Will not store any data
+  -- Will not Sync with the primary
+  -- Can never become the primary
+  -- Priority :0
+  -- votes : Should be 1
+  -- Cannot handle the reads because it has no data
+  -- Will take part in the election and is going to tie breaker
+  -- Multiple arbiters allowed(7 voting members)
+  -- Best practice -- 1 arbiter
+
+If a secondary goes down -- no problem with reads
+
+PSS in REplica set:
+Writes -- primary -- one node
+reads -- default - P; configure -- PSS-- three nodes
+back up data -- time consuming process, requires some locks 
+	-- primary -- load on Primary -- writes/reads
+  -- Secondaries -- some load -- reads
+  -- Hidden member -- no reads; sync with the primary; fresh data; backup 
+
+
+Initially the replica set is initiated (first set up)
+	-- All the members will be "Other" members
+  -- From others , they will become secondaries/arbiter based on setup
+  -- Elections will happen
+  -- One of eligible secondaries will become the primary
+ 
+Secondary goes down 
+	-- No problem with the writes
+  -- Reads also will happen because primary is there
+  -- Totally no problem
+
+Primary goes down:
+	-- Reads may be affected but may happen (secondaries are present)
+  -- Writes will fail
+  -- Election will be initiated -- one of the eligible secondaries will become the primary
+  -- max time for which writes will fail -- 12 seconds
+  
+Eligible secondaries (Candidate to become the primary):
+	-- Priority > 0
+  -- Sync with the primary completely
+  
+Elections will be held when:
+	1. Primary is down( step down of primary)
+  2. Replica set is initiated for the first time
+  3. a new node is added which has the highest priority
+  4. 
+
+Election process:
+	-- Get completed within 12 seconds(default)
+  -- election time period can be configured
+  -- Inbuilt process; Abstracted from all ;
+  -- Nobody can control it
+  -- Candidates -- eligible secondaries(priority >0, completely synced with the primary  )
+  -- Any of the eligible secondaries can call for the election.
+  
+  1. Candidate which has the highest priority -- will become the primary
+  2. If there is a tie at stage 1, check if any of them(candidates from stage1) have been a primary in the past ; if there is a winner -- primary 
+  3. If there is tie at stage 2, voting will happen ; only voting members (max 7) will vote; member with majority of votes will become the primary
+  4. If there is a tie at stage 3, arbiter's vote will be taken as tie breaker
+  5. If there is a tie at stage 3 and If there is no arbiter, round robin process, one of the candidates from stage 3 will become the primary
+  
+
+Interaction between members:
+	-- Each and every member will send a heartbeat to the all members saying that is alive
+  -- Every 2 seconds there is a heart beat which is sent
+  -- No hearbeat received from a node for 10 sec-- that node is considered as down
+  
+  
+maxTimems -- 60secs -- read should complete ; if not complete it will fail
+write -- writeOut time -- write has to be complete
+Scenario 1:
+primary is healthy but because of IO issue -- write is taking a lot of time
+write will fail because of a different error code
+
+Scenario 2:
+power failure in primary server; primary has unhealthy
+write will fail
+
+write will fail ; driver will check the error code; if it is because primary is unhealthy -- retry -- scenario2
+driver will always be notified of changes in configuration of replica set
+    
+Replica set -- Max 50 members
+
+Production
+	Configuration: 5 or 7 members
+  Min : 3 members
+Odd numbers of members  :
+	-- Help in voting
+  -- Writes -- majority
+  
+5 members : majority :3
+6 members : majority :4
+
+PSSSS configuration:
+Client -- write op-- driver -- direct to primary -- primary performs the write ;on primary it has completed; ----; ack will go the client
+
+Ravi : once primary completes ; ack should be sent
+Vasanth :  primary completes ;atleast one secondary should complete;ack should be sent
+Dinagaran : primary completes ;all secondaries should complete;ack should be sent
+Shiva : majority of nodes should complete(primary+ (majority-1 secondaries));3 nodes complete ;ack should be sent
+
+Driver -- load balance the reads among the secondaries
+	-- Not knowledgable ablout which is sync and which is not
+
+High Availability,Eventual Consistency,Least data loss  
+
+write concern:
+  
+primary completes ;atleast one secondary should complete;ack should be sent
+-- 2 members have completed(PS) ; ack is sent; 
+	-- other sec members will asynchronouly sync with the primary
+  -- before the other secondaries could sync
+  Scenario 1: read -- primary ; fresh data
+  Scenario 2: synced sec -- fresh data
+  Scenario 3: unsynced sec -- stale data
+  Disadv:
+  --probability of reading stale data : 3/5;
+  -- 3 nodes have to still sync
+  Adv:
+  -- 2 members will complete ; time required -- 2 nodes to write; faster than when all nodes have to complete
+  -- data loss is also lesser
+  	-- if primary goes down, there is a synced sec with the write data -- loss has come down
+    -- possibility that PS which have completed are both down -- data loss can happen
+    
+once primary completes ; ack should be sent  
+  -- Not a good choice
+  Adv:
+  	-- write op -- fastest; only primary has to complete; ack sent
+  Disadv:
+  	-- probability of reading stale data : 4/5
+    -- write is over in primary; ack is received by the client; 
+    	-- before any sec node could sync; primary goes down; elections happen; sec becomes the primary;
+      -- acknowledged write data -- lost
+      -- 
+
+primary completes ;all secondaries should complete;ack should be sent
+	-- Not a good choice 
+  -- Full Consistency but availability will become a problem
+  -- Adv
+  	-- Full Consistency
+    -- probability of reading stale data : 0
+  -- Disadv:
+  	-- Write -- all the nodes in replica set(healthy/unhealthy) should complete the write
+    	-- Scanario : secondary is down; will not be able to sync with the primary
+      	Healthy nodes : 4, unhealthy nodes :1
+        Writes will keep failing even if a secondary is down
+    -- Dangerous node since writes are failing with primary up and only one secondary down
+  
+  
+majority of nodes should complete(primary+ (majority-1 secondaries));3 nodes complete ;ack should be sent
+ -- Adv:
+ 	-- probability of reading stale data : 2/5
+  -- Consistency -- only 2 more nodes have to sync
+  -- Medium time ; 3/5 nodes have to complete ; not very fast(only Primary); not very slow(all 5 nodes)
+  -- Probability of data loss -- very less
+  	-- 3 nodes have completed the writes; 3 nodes failing together -- very rare
+  -- Disadv:
+  	-- Performance -- medium
+  
+Which is best solution out of the 4
+	-- Buisiness requirement
+  -- Best practice :majority of nodes should complete -- Best consistency; least data loss; high availability
+  	-- writeConcern : 1,2,3...n, majority where n is number of nodes
+ 			--Best practice : writeConcern : majority; // majority of number of nodes should complete the write before the ack can be sent
+      -- Can set it up at replica set level, query level
+      -- Query level write concern takes more priority
+    -- majority is easily calculated when i have odd number of members
+    
+Banking app:
+	transaction:
+  	-- mongodb -- is not ACID compliant
+    -- follows CAP theorem
+    	-- AP; eventual consistency
+    -- hence will not use the mongodb for transactions related operations
+    -- mongodb -- standalone server ; full consistency; availability -- ?
+    
+Syncing of data:
+write opeartion --> directed to primary -> a. primary will perform write on its data b. make an entry in its own oplog collection of the write operation --> after the rpimary has completed--> 
+secondaries will asynchronously sync with the primary--> 
+copy the respective oplog entries(based on timestamp) from the primary oplog to their respective oplog collection and then perform the write on their respective data-->
+once the number of nodes based on the write concern have also synced with the primary --> ack will be sent to the client  
+
+Oplog
+-- Special capped collection
+-- Each member will have its own oplog collection
+-- Will be present in local db;
+
+Collection :
+	-- No restriction on size of collection
+  -- No restriction on number of docs in the collection
+capped collection
+	-- Restriction on either of the one below
+		-- Restriction on size of collection
+  	-- Restriction on number of docs in the collection
+Oplog Collection:
+	-- Each member will have its own oplog collection
+  -- Implicily created when the replica set is initiated 
+	-- Special capped collection:
+  -- Read from the oplog collection -- YES 
+  -- Write into the oplog explicitly using insert or update or delete -- NO
+  	-- Restriction on size of collection
+  	-- Docs are going to be rotated (deleted)
+    	-- Rotated when both of below are satisfied
+      	-- Size of collection has grown beyond the configured size
+        -- Doc has elapsed; min period for which should the doc should stay -- oplogRetentionPeriod
+    -- Oplog can grow beyond the configured size
+    -- Secondaries copy the primary's oplog
+    -- Primary is not constant
+    -- If the oplog of the primary gets rotated and none of the secondaries have synced -- loss of data
+ 		-- Points to remember : Configure the size of oplog -- optimally; oplogRetentionPeriod should be set up correctly
+    
+    Eg :oplogRetentionPeriod -- 2 minutes; size : 64gb;
+    Primary -- bulk write ; oplog entries > 64gb; 
+    because of bulk writes -- secondaries are syncing up (more than 2 minutes) -- chance of data loss- yes 
+    delayed secondary (24 hours )-- will it will be able to sync -- NO
+    
+    oplogRetentionPeriod > delayed secondary delay time -- Not needed
+    
+    Replica set
+    	-- chainingAllowed -- boolean value; default true
+      	-- a secondary node can sync with a fully synched secondary(if available) also
+        -- reduce the load on the primary
+        -- 
+  
+  P(node1)S(node2)S(node3)
+  
+  Always only the secondaries sync with the primary
+  Secondary node can sync only with a fully synched secondary (should be configured)
+  Primary will never sync with the secondary
+
+Configuration: 
+	at the cluster level
+	Status of each node
+  Role of node (P or S or hidden or arbiter or delayed)
+  Replication lag -- lag with respect to each secondary
+  Change in the setup of nodes
+  Elections and their result and the current primary
+	-- Each and every member Will have access to the configuration info
+  -- 
+  
+Syncing 
+-- Sync with the oplog file
+-- If not able to sync because of oplog deletion
+	-- Node 
+  -- 1.delete all the data files
+  --2. Copy the data 	files from the primary
+  --3. Check if there are any oplog entries which happened during the copy of files; copy them to its own oplog and execute them
+  
+Oplog entry :
+	timestamp about the write; write operation; _id
+
+Slow Query :
+	Investigate
+  	-- 1. Query completed 
+    		-- Yes
+        	Use profiler to understand the time , execution plan, locks
+        -- No
+        -- primary -- check if its complete in primary
+        	currentOp() 
+          -- list all the currently running opeartions
+  				-- time for which it is executing
+          -- is it waiting any kind of locks
+          -- server level
+          If its complete in primary and write concern >1 -- problem is in secondaries completing
+          -- secondaries -- currentOp()
+          
+Oplog is corrupted -- PS
+	-- Manually deleted the oplog files physically in the primary server
+  1. Is there any fully synched sec -- NO
+  data which has been written only in the primary and ack is sent to client -- data loss
+  DBA -- step down the server
+
+
+
+  
+  
+ 

@@ -1,0 +1,459 @@
+mongod --config "C:\Users\Admin\Desktop\sharding\mongod1.cfg"
+
+mongod --config "C:\Users\Admin\Desktop\sharding\mongod2.cfg"
+
+mongod --config "C:\Users\Admin\Desktop\sharding\mongod3.cfg"
+
+mongod --config "C:\Users\Admin\Desktop\sharding\mongod4.cfg"
+
+mongod --config "C:\Users\Admin\Desktop\sharding\mongod5.cfg"
+
+mongod --config "C:\Users\Admin\Desktop\sharding\mongod6.cfg"
+
+mongod --config "C:\Users\Admin\Desktop\sharding\mongod7.cfg"
+
+mongod --config "C:\Users\Admin\Desktop\sharding\mongod8.cfg"
+
+mongod --config "C:\Users\Admin\Desktop\sharding\mongod9.cfg"
+
+mongo --port 3001
+
+rs.initiate({
+_id:"lsrs1",
+members:[
+{_id:0,host:"localhost:3001"},
+{_id:1,host:"localhost:3002"},
+{_id:2,host:"localhost:3003"},
+]})
+
+
+mongo --port 3004
+rs.initiate({
+_id:"lsrs2",
+members:[
+{_id:0,host:"localhost:3004"},
+{_id:1,host:"localhost:3005"},
+{_id:2,host:"localhost:3006"},
+]})
+
+
+mongo --port 3007
+
+rs.initiate({
+_id:"crs1",
+members:[
+{_id:0,host:"localhost:3007"},
+{_id:1,host:"localhost:3008"},
+{_id:2,host:"localhost:3009"},
+]})
+
+
+In a new command prompt :
+// Mongos is going to run in port 4001
+mongos --configdb "crs1/localhost:3007" --port 4001
+
+Connect the shell to mongos
+mongo --port 4001
+
+// Add the shards to mongos
+sh.addShard("lsrs1/localhost:3001");// add the firts shard
+ 
+sh.addShard("lsrs2/localhost:3004");// add the second shard
+
+
+
+Shutdown server
+	-- Ctrl +c
+  -- Background process:
+  	Get the pid of the process
+    kill pid -2
+  -- Connect to the shell
+  	--shutdown command cleans up all database resources and then terminates the process. You must issue the 
+shutdown command against the admin database.
+
+The command has this syntax:
+
+db.adminCommand({
+  shutdown: 1,
+  force: <boolean>
+  timeoutSecs: <int>,
+  comment: <any>
+})
+
+Replication:
+	-- High availability
+  -- More number of servers to handle the reads
+  -- Suitable for read intensive app
+  -- Configuration of member : commodity hardware
+  
+Eg : Write intensive app:
+	-- Only 1 primary to handle all the writes
+  -- Requirement -- Many servers which can handle the writes
+  -- May require multiple replica sets
+  
+ Data -- 100tb; high availability
+ 	-- Will not fit in one server
+  -- Replication is also needed
+  -- 
+  
+Sharding:
+	When to do sharding:
+  	-- Data is too huge to fit in one server
+    -- Write intensive app
+    	-- More servers(write servers) to handle the writes
+  -- Break up the data and store in different shards
+  -- Shard -- Hold part of actual data
+  -- Shard -- Replica set
+  -- Multiple shards; multiple replica sets; Primary in each replica set
+  	-- Each replica set will have a part of data
+    -- Members within the replica set will only replicate that part of data
+  --Any number of shard possible
+  --Config server -- Hold meta data
+  -- Only one config server(Replica set) allowed
+  -- Metadata -- Multiple shards; Each shard holds a part of data
+  	-- which shard has which data -- metadata
+    -- Stored in config server
+    	-- High availability of config server is required
+      -- Config server is also a replica set;
+      	-- Mandatory (>4.x)
+        -- Standalone server (<4.x)
+    -- Mongos 
+    	-- Stateless router
+      -- Multiple mongos allowed
+      -- Multiple instances of mongos running seperartely
+      	-- Each application server will have a mongos -- Best practice
+      -- Process 
+      -- Point of contact from the client
+
+Only when replication is present and no sharding:
+client --> driver --> basis of query --> direct the query to corresponding member of replica set     
+        
+Sharding enabled:
+
+client --> driver --> mongos --> for particular query --> get the metadata from config server --> based on the metadata , contact only the required shard(s) and get the data
+--> give it to the client
+
+Break up the data:
+	-- shard key 
+  -- Range based sharding
+  -- hashed based sharding
+  
+Employee collection: empId, empName, salary, projectDetails, _id
+Example : empId -- shard key -- range based sharding
+Sharding is enabled ; 2 shards ; 1 config server
+
+Data is going to be broken up in chunks
+Default size of chunk : 64mb
+Load the data in collection
+Collection size : 32 mb -- Number of chunks: 1
+Collection size : 132 mb -- Number of chunks: 3
+Meta data stored in config server based on shard key (empId)
+chunk 1: min key to 10000
+chunk2 : 10001 to 15000
+chunk 3: 15001 to max key
+Chunk -- Documents with Consecutive set of shard key values
+	-- Size be configured
+  -- Chunk grow more than the configured size -- yes
+  -- Chunk be broken down into 2
+  	-- Explicitly
+    	-- Commands
+    -- Implicitly
+			-- Grows beyond the configured size
+
+-- Chunks are going to stored in the various shards
+
+Auto splitting of chunks -- on /off
+-- Auto splitting of chunks -- on ; -- maintanence period
+
+-- Balancer -- balance the chunks among the various shards
+	-- Can be enabled or disabled
+  -- Best time to enable the balancer -- maintanence period
+  -- balancer is disabled -- no chunk migrations
+	Strategy 1: <=version 5.x
+		-- Number of chunks
+    	--Each shard should have a similar number of chunks
+      	-- When there is a difference in the number of chunks in the shards -- balanacer will balance them
+        	-- Chunks -3; shards -2
+          shardA - chunk1, chunk2
+          shardB -- chunk3
+          
+          -- Chunks - 34, shard -3
+          shardA -- chunk 1 -17 ; Number of chunks : 17
+          shardB -- chunk 18 - chunk 31; Number of chunks -14
+          shardC -- chunk 32 - 34 -- ; Number of chunks -13
+					-- Not balanced
+          -- balancer will balance the chunks -- migration of chunks
+          After balancing
+          shardA -- chunk 1 -11 ; Number of chunks : 11
+          shardB -- chunk 12 - chunk 22; Number of chunks -11
+          shardC -- chunk 23 - 34 -- ; Number of chunks -12
+
+Strategy 2 : > 5.x
+ -- When will migrations happen:
+ 		default chunk size: 128mb
+     --For the default range size of 128MB, 
+     two shards must have a data size difference for a given collection of at least 384MB for a migration to occur.
+Query :
+
+Read query:
+Eg 1:
+	db.employee.find({empId:500})
+  client --> mongos --> contact the config server;--> config server will return the meta data (shardA, chunk 1)--> mongos --> will send the query only to shardA 
+  --> shardA will get the data from chunk 1 and return to mongos --> mongos will return the data to client
+
+Eg 2:
+	db.employee.find({empId:{$gt:500,$lt:14000}})
+  client --> mongos --> contact the config server;--> config server will return the meta data (shardA, chunk 1,chunk2)--> mongos --> will send the query only to shardA 
+  --> shardA will get the data from chunk 1,2 and return to mongos --> mongos will return the data to client
+  
+  
+Eg 3:
+	db.employee.find({empId:{$gt:11000,$lt:17000}})
+  client --> mongos --> contact the config server;--> config server will return the meta data (shardA, chunk2; shardB chunk3)--> mongos --> will send the query only to shardA and shardB
+  --> shardA will get the data from chunk 2 and return to mongos;shardB will get the data from chunk 3 and return to mongos;mongos has to merge the data from the 2 shards --> mongos will return the data to client
+Eg 4:
+	db.employee.find({empName:"sara"})
+	client --> mongos --> contact the config server and asking for metadata based on empName --> no data from config server
+  --> mongos broadcast the query to all the shards --> shards will execute the query on all its chunks;--> returnthe data to mongos -->
+  mongos has to merge all the data from all teh shards and give the result to the client
+  --> Time consuming --> Read on non shard key
+
+Eg 5:
+	db.employee.insertOne({empId:507,empName:"tara"})
+	client --> mongos -->  contact the config server--> return shardA, chunk as the metatdata where the write has to be performed -->
+  write will be sent to primary of the shardA; based on write concern of replica set of shardA, required number of secondaries will complte the sync --> ack will be sent to mongos -->mongos sent the ack to client
+
+Mongos 
+-- Process started from mongodb environment
+-- Not a server
+-- best practice -- initiate the mongos from application server
+
+Config server :
+	-- Will be in contact with mongos
+  -- Will be in contact with the shards
+  -- Any changes (chunk migrations, data changes in chunks(write operations), chunk splitting(manually, automatically)) will be notified to config server
+  -- Should be always up to date only on basis of shard key
+  -- 
+
+mongodb : AP according to CAP theorem; eventual consistency
+full consistency -- standalone server
+
+Created 2 collections: emp,zipcode
+	Is the data going to be partitioned -- NO
+  Entire data and collections will be stored in a single shard and not partitioned
+	
+
+For sharding :
+1. Enable sharding at database level
+	sh.enableSharding("shardingDb");
+2. Sharded database -- can have 2 types of collections
+	Sharded collection
+  Un sharded collection -- zipcode,emp
+3. Shard a collection explicitly
+	sh.shardCollection("shardingDb.zipcode",shardkey)
+
+
+Shard key 
+	-- Simple or composite
+  -- <5.x shark key should be immutable
+  	-- Once sharding is done with a particular shard key, it cannot changed
+  -- 5.x -- add more fields to shard key
+  -- 6.x -- can change the shard key
+  -- There should always be an asc order index on shard key 	
+	-- Choice is very important
+  -- Shard key selection affects the reads and writes
+  	-- Affect the reads/ writes -- based on shard key, it will be stored in a particular chunk in a particular shard
+    -- Reads/ writes performance 
+    	-- query based on shard key -- fast
+  		-- query based on non shard key -- slower -- broadcast and merge
+  -- Range based 
+  -- hash based
+-- state
+	sh.shardCollection("shardingDb.zipcode",{state:1});// error
+  
+  Created an asc order index
+  	db.zipcode.createIndex({state:1});// range based sharding
+  	sh.shardCollection("shardingDb.zipcode",{state:1});
+  OR
+  Created a hashed  index
+  db.zipcode.createIndex({state:"hashed"});// hashed based sharding
+  When to use hashed index
+  	-- even ditribution of data
+    -- ObjectId, timestamp
+	sh.shardCollection("shardingDb.zipcode",{state:"hashed"});
+
+	collection size : 4.1kb
+  chunk size : 64mb
+  Number of chunks:1
+
+Manually split the chunks:
+sh.splitAt()
+sh.splitFind()
+
+sh.splitAt("shardingDb.zipcode",{state:"MA"});// split the chunk which has the document with state:MA  into 2
+  
+   { "state" : { "$minKey" : 1 } } -->> { "state" : "IA" } on : lsrs1 Timestamp(2, 2)
+    { "state" : "IA" } -->> { "state" : "MA" } on : lsrs1 Timestamp(2, 3)
+     { "state" : "MA" } -->> { "state" : { "$maxKey" : 1 } } on : lsrs2 Timestamp(2, 1)
+     
+sh.splitAt("shardingDb.zipcode",{state:"AK"});// 4 chunks and migrations will happen
+lsrs1 : 2
+lsrs2 : 2
+   { "state" : { "$minKey" : 1 } } -->> { "state" : "AK" } on : lsrs1 Timestamp(2, 2)
+   { "state" : { "$minKey" : "AK" } } -->> { "state" : "IA" } on : lsrs1 Timestamp(2, 2)
+    { "state" : "IA" } -->> { "state" : "MA" } on : lsrs2 Timestamp(2, 3)
+     { "state" : "MA" } -->> { "state" : { "$maxKey" : 1 } } on : lsrs2 Timestamp(2, 1)
+     
+     
+     
+     
+ Chunk Migration Procedure
+All chunk migrations use the following procedure:
+
+The balancer process sends the moveChunk command to the source shard.
+
+The source starts the move with an internal moveChunk command. During the migration process, operations to the chunk route to the source shard. The source shard is responsible for incoming write operations for the chunk.
+
+The destination shard builds any indexes required by the source that do not exist on the destination.
+
+The destination shard begins requesting documents in the chunk and starts receiving copies of the data. See also 
+Chunk Migration and Replication.
+
+After receiving the final document in the chunk, the destination shard starts a synchronization process to ensure that it has the changes to the migrated documents that occurred during the migration.
+
+When fully synchronized, the source shard connects to the config database and updates the cluster metadata with the new location for the chunk.
+
+After the source shard completes the update of the metadata, and once there are no open cursors on the chunk, the source shard deletes its copy of the documents.
+
+NOTE    
+
+Currently -- 2shards; 4 chunks
+ { "state" : { "$minKey" : 1 } } -->> { "state" : "AK" } on : lsrs1 Timestamp(2, 2)
+   { "state" : { "$minKey" : "AK" } } -->> { "state" : "IA" } on : lsrs1 Timestamp(2, 2)
+    { "state" : "IA" } -->> { "state" : "MA" } on : lsrs2 Timestamp(2, 3)
+     { "state" : "MA" } -->> { "state" : { "$maxKey" : 1 } } on : lsrs2 Timestamp(2, 1)
+     
+  
+Add a new shard
+Number of shards: 3 shards; 4 chunks
+lrs1: 2
+lrs2 : 2
+lrs3 : 0
+Difference has reached the threshold: Initiate the chunk migration provided the balancer is enabled
+
+Different combinations possible
+lrs1:2; lrs2:1;lrs3:1 -- Balanced; Best option ; least number of migrations required
+lrs1:1; lrs2:2;lrs3:1 -- Balanced; 2 chunks will be migrated; 
+lrs1:1; lrs2:1;lrs3:2 -- Balanced
+
+Adv:
+	-- Simple setup
+  -- Sync is automatically
+  -- Migrations/ auto split should be done in maintanence period
+  -- Migrations is abstracted from dba
+  -- Reads/ writes based on shard key is faster
+  -- More reads/ writes can happen parallely
+  
+Disadv of sharding:
+	-- More time when compared to standalone
+  -- Read/ write queries based on non shard key -- more time
+  -- More resources
+  -- Hot shards can get created-- burden
+  -- Collection once sharded cannot be unsharded
+  	-- Drop the collection and recreate it
+  -- Changing the shard key(>=6.x) is also a cumbersome task
+  -- 
+
+In latest version >6.x, enabling sharding at db level not required
+
+Replica set -- 1 or more members
+Best practice : minimum 3 members 
+Config server -- replica set ; Best practice : minimum 3 members 
+
+Possible combinations:
+Shard servers: lsrs1(PSS); lsrs2(PSSSS)
+configserver : crs1(PSSSA)
+
+
+Migrating from 3.x to 4.x
+3.x -- config server -- standalone server
+4.x -- Config server should be a replica set
+	Convert to replica set of 1 member 
+
+
+Import and export data
+	-- data csv/json
+  -- stop on errors
+  Import the data
+  -- Adv:
+  	-- Get the data in csv inside a collection
+  -- Disadv:
+		-- data should be csv or json -- 
+    -- Other formats are not supported
+  Export the data
+  	bson data is converted to either json or csv
+    bson --> json -- loss of data
+    Only data is exported; Indexes are not exported
+    
+Back up and restore
+	-- Not equivalent to import/export in mongodb
+  -- backup using mongo backup -- bson data is going to backed up in bson format
+  -- Metadata of indexes are also backed up 
+  -- back up -- server, databases, collection, particular query result set also
+  -- 
+Restore
+	-- Restore the entire server or db or collection
+  -- Point in time restore (ops manager, atlas)
+  -- Restoration -- get the data back, it will build the indexes implicitly based on backed up meta data
+  
+back up of data:
+1.By copying the underlying physical files
+  -- Shutdown the server and take the backup for a proper backup
+  	--Adv
+    	-- Simple process
+      -- Indexes are also backed up
+      -- No need to build the indexes
+    -- Disadv
+			-- time consuming process 
+      -- manual process
+      -- write operation happening during copy
+      	-- will not get backed up
+      -- Usually not possible to shutdown the server
+      
+2. Use tool mongo backup tool for taking the backup -- mongodump
+	-- If a replica set -- hidden member
+  -- Backup of data with index metadata -- backed up
+  -- Option to take a backup of part of oplog(oplog entries happening during the backup)
+  -- During the restore -- replay the backed up oplog entries 
+	-- snapshot of consistent data -- backup from snapshot will start; writes can happen simultaneously;copy the oplog entries during the backup and add it to the backup
+  
+1 tb of data
+mongobackup -- started at 12:45 pm
+It takes 2 minutes
+finish at : 12:47pm
+writes may happen b/w 12:45 and 12:47-- these oplog entries will be backed up
+backup till -- 12:47pm
+		Disadv:
+    	-- Rebuild of indexes implicitly
+      -- Point in restore using backup tool
+      
+3. Use ops manager or atlas (Paid) or Percona (free)
+	-- Backup;
+  	-- Incremental backups also possible
+  -- Restore 
+  	-- Point in time restore
+
+4. LVM on linux
+
+
+Sharding backup 
+	-- backup from mongos using mongodump
+
+Ops manager :
+	-- Tool for monitoring/managing/automating the deployments(standalone, replica set, sharded )
+  
+  
+
+
+      
+      
